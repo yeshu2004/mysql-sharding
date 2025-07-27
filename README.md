@@ -1,49 +1,66 @@
-# MySQL Sharding Implementation in Go
+# Go MySQL Sharding Example
 
-This project demonstrates a basic sharding implementation in Go using MySQL, where data is distributed across multiple database instances (`first_recording` and `second_recording`) based on a sharding key.
+This project demonstrates a simple sharding approach in Go using two MySQL databases. Album records are distributed between two databases (`first_recording` and `secound_recording`) based on a hash of their UUID.
 
-## Overview
+## Features
 
-- **Sharding Logic**: The `albumsByIdSharded` function implements sharding by using the modulo operation (`id % 10`) on the album ID. IDs with a modulo less than 5 are stored in `db1`, while those with a modulo between 5 and 9 are stored in `db2`.
-- **Database Connections**: The program establishes connections to two MySQL databases using the `github.com/go-sql-driver/mysql` driver and manages them via the `database/sql` package.
-- **Environment Configuration**: Database credentials and connection details are loaded from a `.env` file using the `github.com/joho/godotenv` package.
+- **Sharding Logic:** Uses FNV-1a hash on the album UUID. If `hash % 2 == 0`, the record goes to `db1` (`first_recording`); otherwise, it goes to `db2` (`secound_recording`).
+- **CRUD Operations:** 
+  - Add a new album (`addAlbum`)
+  - Get album by ID (`getAlbum`)
+  - Query albums by artist across both shards (`albumsByArtist`)
+- **Environment Configuration:** Loads DB credentials from a `.env` file.
 
 ## Setup
 
-1. **Install Dependencies**:
+1. **Install Dependencies**
    ```bash
    go get github.com/go-sql-driver/mysql
    go get github.com/joho/godotenv
+   go get github.com/google/uuid
    ```
 
-2. **Configure Environment**:
-   - Create a `.env` file in the project root with the following variables:
+2. **Configure MySQL**
+   - Create two databases: `first_recording` and `secound_recording`.
+   - Create the `album` table in both databases:
+     ```sql
+     CREATE TABLE album (
+         id VARCHAR(36) NOT NULL,
+         title VARCHAR(128) NOT NULL,
+         artist VARCHAR(128) NOT NULL,
+         price DECIMAL(5,2) NOT NULL,
+         PRIMARY KEY (id)
+     );
      ```
-     DBUSER=your_username
-     DBPASS=your_password
-     ```
-   - Ensure MySQL is running locally on `127.0.0.1:3306` with the databases `first_recording` and `second_recording` created.
 
-3. **Run the Application**:
+3. **Create a `.env` File**
+   ```
+   DBUSER=your_mysql_user
+   DBPASS=your_mysql_password
+   ```
+
+4. **Run the Application**
    ```bash
    go run main.go
    ```
 
-## Usage
+## How Sharding Works
 
-- **Query by ID**: The `albumsByIdSharded` function retrieves an album by its ID, routing the query to the appropriate database based on the sharding logic.
-- **Query by Artist**: The `albumsByArtist` function queries all albums by a given artist from `db1` (non-sharded for simplicity).
+- The function `getShardById(id string)` hashes the UUID and uses `%2` to select the database.
+- This ensures that the same UUID always maps to the same shard.
 
-## Sharding Details
+## Example Usage
 
-- **Sharding Key**: The album `ID` is used as the sharding key.
-- **Distribution**: 
-  - `ID % 10 < 5` → `db1`
-  - `5 <= ID % 10 < 10` → `db2`
-- **Limitations**: This is a basic implementation with a fixed modulo range. For production, consider dynamic sharding keys and more robust distribution strategies.
+- **Add an Album:**  
+  Adds a new album to the correct shard based on its generated UUID.
+- **Get Album by ID:**  
+  Retrieves an album from the correct shard using its UUID.
+- **Get Albums by Artist:**  
+  Searches both shards for albums by a given artist.
 
-## Future Improvements
+## Notes
 
-- Add support for additional databases.
-- Implement dynamic sharding key configuration.
-- Enhance error handling and connection pooling.
+- This is a basic sharding demo. For production, consider more shards and advanced hash/distribution strategies.
+- The `.env` file should be added to `.gitignore` to avoid exposing credentials.
+
+## License
